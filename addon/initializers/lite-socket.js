@@ -8,7 +8,15 @@ export default function Socket(container, application){
   	this.alreadyConnected = false;
 	this.ws = null;
 	this.heartbeat_interval = null;
-	this._callbacks = {onmessage:[]};
+	this._callbacks = {
+		onmessage:[],
+		onclose: []
+	};
+	
+	
+	this.heartbeatEnabled = application.heartbeatEnabled || false;
+	this.heartbeatString = application.heartbeatString || "heartbeat";
+	this.socketUri = application.socketUri || "ws://localhost:4000";
 	
 	
 	
@@ -24,10 +32,15 @@ export default function Socket(container, application){
 }
 
 Socket.prototype.start = function start(){
-	
+  console.log("HELLO HEEL");	
   console.log("start");
+  
+  console.log(this.heartbeatEnabled);
+
+//console.log("HEART BEAT: " + config().heartbeat);
+//console.log("TESTING: " + config.testing);
  
- this.ws = new WebSocket('ws://localhost:4000');
+ this.ws = new WebSocket(this.socketUri);
  
  //hmmmm
  this._callbacks.onmessage = [];
@@ -58,29 +71,32 @@ Socket.prototype.start = function start(){
 	  
 
 		  console.log("app ready socket is open");
-   	  
+		  
+		  
+		  if(self.heartbeatEnabled){
 
-   	    if (self.heartbeat_interval === null) {
+		   	    if (self.heartbeat_interval === null) {
  	   
-   	        self.heartbeat_interval = setInterval(function() {
-   	            try {
-					//console.log("increment the heartbeat");
-					//console.log(window.missed_heartbeats);
-   	                window.missed_heartbeats = window.missed_heartbeats + 1;
-					//console.log(window.missed_heartbeats);
-   	                if (window.missed_heartbeats >= 3)
-   	                    throw new Error("Too many missed heartbeats.");
-					//console.log(window.missed_heartbeats);
+		   	        self.heartbeat_interval = setInterval(function() {
+		   	            try {
+							//console.log("increment the heartbeat");
+							//console.log(window.missed_heartbeats);
+		   	                window.missed_heartbeats = window.missed_heartbeats + 1;
+							//console.log(window.missed_heartbeats);
+		   	                if (window.missed_heartbeats >= 3)
+		   	                    throw new Error("Too many missed heartbeats.");
+							//console.log(window.missed_heartbeats);
 				
                 
-   	            } catch(e) {
-   	                clearInterval(this.heartbeat_interval);
-   	                this.heartbeat_interval = null;
-   	                console.warn("Closing connection. Reason: " + e.message);
-					this.ws.close();
-   	            }
-   	        }, 5000);
-   	    }				
+		   	            } catch(e) {
+		   	                clearInterval(this.heartbeat_interval);
+		   	                this.heartbeat_interval = null;
+		   	                console.warn("Closing connection. Reason: " + e.message);
+							this.ws.close();
+		   	            }
+		   	        }, 5000);
+		   	    }	
+			}			
 	}
 	
 	this.ws.onclose = function(){
@@ -93,18 +109,30 @@ Socket.prototype.start = function start(){
 		console.log(message.data);
 		//offer the same callback handler as html5 websocket.
 		self.onmessage(message);
-		  
-		  if(message.data === "heartbeat"){
+		if(self.heartbeatEnabled){
+	  		  if(message.data === self.heartbeatString){
 
-			  window.missed_heartbeats = 0;
-			  console.log(window.missed_heartbeats);
+	  			  window.missed_heartbeats = 0;
+	  			  console.log(window.missed_heartbeats);
 	  
-			  return
-		  }
+	  			  return
+	  		  }	
+		}  
 		  
 	}
 	
 }
+
+Socket.prototype.send(message){
+	var string = JSON.stringify(message);
+	this.ws.send(string);
+}
+
+Socket.prototype.onclose = function() {
+    console.log(">>> close the socket " );
+    for (var i=0; i<this._callbacks['onclose'].length; i++)
+        this._callbacks['onclose'][i]();
+};
 
 Socket.prototype.onmessage = function(message) {
     console.log(">>> call the message " + message.data);
